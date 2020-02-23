@@ -7,13 +7,12 @@ import (
 	"io/ioutil"
 	nurl "net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
-)
 
-import (
-	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/google/go-github/github"
+
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 func init() {
