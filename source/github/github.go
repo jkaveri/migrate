@@ -7,13 +7,12 @@ import (
 	"io/ioutil"
 	nurl "net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
-)
 
-import (
-	"github.com/golang-migrate/migrate/v4/source"
 	"github.com/google/go-github/github"
+
+	"github.com/golang-migrate/migrate/v4/source"
 )
 
 func init() {
@@ -182,7 +181,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			context.Background(),
 			g.config.Owner,
 			g.config.Repo,
-			path.Join(g.config.Path, m.Raw),
+			filepath.Join(g.config.Path, m.Raw),
 			g.options,
 		)
 
@@ -208,7 +207,7 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			context.Background(),
 			g.config.Owner,
 			g.config.Repo,
-			path.Join(g.config.Path, m.Raw),
+			filepath.Join(g.config.Path, m.Raw),
 			g.options,
 		)
 
