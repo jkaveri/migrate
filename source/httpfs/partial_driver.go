@@ -4,7 +4,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 
 	"github.com/golang-migrate/migrate/v4/source"
@@ -108,7 +108,7 @@ func (p *PartialDriver) Next(version uint) (nextVersion uint, err error) {
 // ReadUp is part of source.Driver interface implementation.
 func (p *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := p.migrations.Up(version); ok {
-		body, err := p.fs.Open(path.Join(p.path, m.Raw))
+		body, err := p.fs.Open(filepath.Join(p.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}
@@ -124,7 +124,7 @@ func (p *PartialDriver) ReadUp(version uint) (r io.ReadCloser, identifier string
 // ReadDown is part of source.Driver interface implementation.
 func (p *PartialDriver) ReadDown(version uint) (r io.ReadCloser, identifier string, err error) {
 	if m, ok := p.migrations.Down(version); ok {
-		body, err := p.fs.Open(path.Join(p.path, m.Raw))
+		body, err := p.fs.Open(filepath.Join(p.path, m.Raw))
 		if err != nil {
 			return nil, "", err
 		}

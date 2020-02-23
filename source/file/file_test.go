@@ -186,7 +186,7 @@ func TestClose(t *testing.T) {
 }
 
 func mustWriteFile(t testing.TB, dir, file string, body string) {
-	if err := ioutil.WriteFile(path.Join(dir, file), []byte(body), 06444); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(body), 06444); err != nil {
 		t.Fatal(err)
 	}
 }

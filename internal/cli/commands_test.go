@@ -1,7 +1,12 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
 	"testing"
+	"time"
 )
 
 func TestCleanDir(t *testing.T) {
@@ -39,32 +44,31 @@ func TestNextSeq(t *testing.T) {
 	cases := []struct {
 		name           string
 		matches        []string
-		dir            string
 		seqDigits      int
 		expected       string
 		expectedErrStr string
 	}{
-		{"Bad digits", []string{}, "migrationDir/", 0, "", "Digits must be positive"},
-		{"Single digit initialize", []string{}, "migrationDir/", 1, "1", ""},
-		{"Single digit malformed", []string{"bad"}, "migrationDir/", 1, "", "Malformed migration filename: bad"},
-		{"Single digit no int", []string{"bad_bad"}, "migrationDir/", 1, "", "strconv.Atoi: parsing \"bad\": invalid syntax"},
-		{"Single digit negative seq", []string{"-5_test"}, "migrationDir/", 1, "", "Next sequence number must be positive"},
-		{"Single digit increment", []string{"3_test", "4_test"}, "migrationDir/", 1, "5", ""},
-		{"Single digit overflow", []string{"9_test"}, "migrationDir/", 1, "", "Next sequence number 10 too large. At most 1 digits are allowed"},
-		{"Zero-pad initialize", []string{}, "migrationDir/", 6, "000001", ""},
-		{"Zero-pad malformed", []string{"bad"}, "migrationDir/", 6, "", "Malformed migration filename: bad"},
-		{"Zero-pad no int", []string{"bad_bad"}, "migrationDir/", 6, "", "strconv.Atoi: parsing \"bad\": invalid syntax"},
-		{"Zero-pad negative seq", []string{"-000005_test"}, "migrationDir/", 6, "", "Next sequence number must be positive"},
-		{"Zero-pad increment", []string{"000003_test", "000004_test"}, "migrationDir/", 6, "000005", ""},
-		{"Zero-pad overflow", []string{"999999_test"}, "migrationDir/", 6, "", "Next sequence number 1000000 too large. At most 6 digits are allowed"},
-		{"dir - no trailing slash", []string{"migrationDir/000001_test"}, "migrationDir", 6, "", `strconv.Atoi: parsing "/000001": invalid syntax`},
-		{"dir - with dot prefix success", []string{"migrationDir/000001_test"}, "./migrationDir/", 6, "", `strconv.Atoi: parsing "migrationDir/000001": invalid syntax`},
-		{"dir - no dir prefix", []string{"000001_test"}, "migrationDir/", 6, "000002", ""},
-		{"dir - strip success", []string{"migrationDir/000001_test"}, "migrationDir/", 6, "000002", ""},
+		{"Bad digits", []string{}, 0, "", "Digits must be positive"},
+		{"Single digit initialize", []string{}, 1, "1", ""},
+		{"Single digit malformed", []string{"bad"}, 1, "", "Malformed migration filename: bad"},
+		{"Single digit no int", []string{"bad_bad"}, 1, "", "strconv.Atoi: parsing \"bad\": invalid syntax"},
+		{"Single digit negative seq", []string{"-5_test"}, 1, "", "Next sequence number must be positive"},
+		{"Single digit increment", []string{"3_test", "4_test"}, 1, "5", ""},
+		{"Single digit overflow", []string{"9_test"}, 1, "", "Next sequence number 10 too large. At most 1 digits are allowed"},
+		{"Zero-pad initialize", []string{}, 6, "000001", ""},
+		{"Zero-pad malformed", []string{"bad"}, 6, "", "Malformed migration filename: bad"},
+		{"Zero-pad no int", []string{"bad_bad"}, 6, "", "strconv.Atoi: parsing \"bad\": invalid syntax"},
+		{"Zero-pad negative seq", []string{"-000005_test"}, 6, "", "Next sequence number must be positive"},
+		{"Zero-pad increment", []string{"000003_test", "000004_test"}, 6, "000005", ""},
+		{"Zero-pad overflow", []string{"999999_test"}, 6, "", "Next sequence number 1000000 too large. At most 6 digits are allowed"},
+		{"dir - no trailing slash", []string{"migrationDir/000001_test"}, 6, "000002", ""},
+		{"dir - with dot prefix success", []string{"migrationDir/000001_test"}, 6, "000002", ""},
+		{"dir - no dir prefix", []string{"000001_test"}, 6, "000002", ""},
+		{"dir - strip success", []string{"migrationDir/000001_test"}, 6, "000002", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			nextSeq, err := nextSeq(c.matches, c.dir, c.seqDigits)
+			nextSeq, err := nextSeq(c.matches, c.seqDigits)
 			if nextSeq != c.expected {
 				t.Error("Incorrect nextSeq: " + nextSeq + " != " + c.expected)
 			}
@@ -115,4 +119,47 @@ func TestNumDownFromArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateCMD(t *testing.T) {
+	var rootDir = getProjectRoot()
+	var testOutputDir = filepath.Join(rootDir, "testoutput", "create_cmd_test_"+strconv.FormatInt(time.Now().Unix(), 10))
+	const ext = ".sql"
+	const seqDigits = 6
+	var up, down string
+
+	// clean test folder
+	createCmd(testOutputDir, time.Now(), defaultTimeFormat, "test_1", ext, true, seqDigits)
+	up, down = generateMigrationFiles(testOutputDir, "000001", "test_1", ext)
+	if _, err := os.Stat(up); os.IsNotExist(err) {
+		t.Error("migration up file was not created")
+	}
+	if _, err := os.Stat(down); os.IsNotExist(err) {
+		t.Error("migration up file was not created")
+	}
+
+	createCmd(testOutputDir, time.Now(), defaultTimeFormat, "test_2", ext, true, seqDigits)
+	up, down = generateMigrationFiles(testOutputDir, "000002", "test_2", ext)
+	if _, err := os.Stat(up); os.IsNotExist(err) {
+		t.Error("migration up file was not created")
+	}
+	if _, err := os.Stat(down); os.IsNotExist(err) {
+		t.Error("migration up file was not created")
+	}
+
+	cleanTestUpMigrationDi(testOutputDir, t)
+}
+
+func cleanTestUpMigrationDi(dir string, t *testing.T) {
+	err := os.RemoveAll(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func getProjectRoot() string {
+	_, file, _, _ := runtime.Caller(0)
+	dir, _ := filepath.Split(file)
+	rootPath, _ := filepath.Abs(filepath.Join(dir, "../.."))
+	return rootPath
 }

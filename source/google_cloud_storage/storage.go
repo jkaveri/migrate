@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"cloud.google.com/go/storage"
@@ -52,7 +53,7 @@ func (g *gcs) loadMigrations() error {
 	})
 	object, err := iter.Next()
 	for ; err == nil; object, err = iter.Next() {
-		_, fileName := path.Split(object.Name)
+		_, fileName := filepath.Split(object.Name)
 		m, parseErr := source.DefaultParse(fileName)
 		if parseErr != nil {
 			continue
@@ -110,7 +111,7 @@ func (g *gcs) ReadDown(version uint) (io.ReadCloser, string, error) {
 }
 
 func (g *gcs) open(m *source.Migration) (io.ReadCloser, string, error) {
-	objectPath := path.Join(g.prefix, m.Raw)
+	objectPath := filepath.Join(g.prefix, m.Raw)
 	reader, err := g.bucket.Object(objectPath).NewReader(context.Background())
 	if err != nil {
 		return nil, "", err

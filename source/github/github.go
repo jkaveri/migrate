@@ -182,7 +182,7 @@ func (g *Github) ReadUp(version uint) (r io.ReadCloser, identifier string, err e
 			context.Background(),
 			g.config.Owner,
 			g.config.Repo,
-			path.Join(g.config.Path, m.Raw),
+			filepath.Join(g.config.Path, m.Raw),
 			g.options,
 		)
 
@@ -208,7 +208,7 @@ func (g *Github) ReadDown(version uint) (r io.ReadCloser, identifier string, err
 			context.Background(),
 			g.config.Owner,
 			g.config.Repo,
-			path.Join(g.config.Path, m.Raw),
+			filepath.Join(g.config.Path, m.Raw),
 			g.options,
 		)
 

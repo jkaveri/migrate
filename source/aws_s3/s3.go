@@ -5,13 +5,14 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+
 	"github.com/golang-migrate/migrate/v4/source"
 )
 
@@ -85,7 +86,7 @@ func (s *s3Driver) loadMigrations() error {
 		return err
 	}
 	for _, object := range output.Contents {
-		_, fileName := path.Split(aws.StringValue(object.Key))
+		_, fileName := filepath.Split(aws.StringValue(object.Key))
 		m, err := source.DefaultParse(fileName)
 		if err != nil {
 			continue
@@ -140,7 +141,7 @@ func (s *s3Driver) ReadDown(version uint) (io.ReadCloser, string, error) {
 }
 
 func (s *s3Driver) open(m *source.Migration) (io.ReadCloser, string, error) {
-	key := path.Join(s.config.Prefix, m.Raw)
+	key := filepath.Join(s.config.Prefix, m.Raw)
 	object, err := s.s3client.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(s.config.Bucket),
 		Key:    aws.String(key),

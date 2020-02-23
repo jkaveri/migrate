@@ -3,28 +3,30 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/stub" // TODO remove again
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/stub" // TODO remove again
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
+func nextSeq(matches []string, seqDigits int) (string, error) {
 	if seqDigits <= 0 {
 		return "", errors.New("Digits must be positive")
 	}
 
 	nextSeq := 1
 	if len(matches) > 0 {
-		filename := matches[len(matches)-1]
-		matchSeqStr := strings.TrimPrefix(filename, dir)
+		fullFilePath := matches[len(matches)-1]
+		_, matchSeqStr := filepath.Split(fullFilePath)
 		idx := strings.Index(matchSeqStr, "_")
 		if idx < 1 { // Using 1 instead of 0 since there should be at least 1 digit
-			return "", errors.New("Malformed migration filename: " + filename)
+			return "", errors.New("Malformed migration filename: " + fullFilePath)
 		}
 		matchSeqStr = matchSeqStr[0:idx]
 		var err error
@@ -51,7 +53,7 @@ func nextSeq(matches []string, dir string, seqDigits int) (string, error) {
 
 // cleanDir normalizes the provided directory
 func cleanDir(dir string) string {
-	dir = filepath.Clean(dir)
+	dir = path.Clean(dir)
 	switch dir {
 	case ".":
 		return ""
@@ -65,46 +67,52 @@ func cleanDir(dir string) string {
 // createCmd (meant to be called via a CLI command) creates a new migration
 func createCmd(dir string, startTime time.Time, format string, name string, ext string, seq bool, seqDigits int) {
 	dir = cleanDir(dir)
-	var base string
 	if seq && format != defaultTimeFormat {
 		log.fatalErr(errors.New("The seq and format options are mutually exclusive"))
 	}
+	var prefix string
 	if seq {
 		if seqDigits <= 0 {
 			log.fatalErr(errors.New("Digits must be positive"))
 		}
-		matches, err := filepath.Glob(dir + "*" + ext)
+		matches, err := filepath.Glob(filepath.Join(dir, "*"+ext))
 		if err != nil {
 			log.fatalErr(err)
 		}
-		nextSeqStr, err := nextSeq(matches, dir, seqDigits)
+		nextSeqStr, err := nextSeq(matches, seqDigits)
 		if err != nil {
 			log.fatalErr(err)
 		}
-		base = fmt.Sprintf("%v%v_%v.", dir, nextSeqStr, name)
+		prefix = nextSeqStr
 	} else {
 		switch format {
 		case "":
 			log.fatal("Time format may not be empty")
 		case "unix":
-			base = fmt.Sprintf("%v%v_%v.", dir, startTime.Unix(), name)
+			prefix = strconv.FormatInt(startTime.Unix(), 10)
 		case "unixNano":
-			base = fmt.Sprintf("%v%v_%v.", dir, startTime.UnixNano(), name)
+			prefix = strconv.FormatInt(startTime.UnixNano(), 10)
 		default:
-			base = fmt.Sprintf("%v%v_%v.", dir, startTime.Format(format), name)
+			prefix = startTime.Format(format)
 		}
 	}
 
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		log.fatalErr(err)
 	}
-
-	createFile(base + "up" + ext)
-	createFile(base + "down" + ext)
+	up, down := generateMigrationFiles(dir, prefix, name, ext)
+	createFile(up)
+	createFile(down)
 }
 
 func createFile(fname string) {
-	if _, err := os.Create(fname); err != nil {
+	file, err := os.Create(fname)
+	if err != nil {
+		log.fatalErr(err)
+		return
+	}
+	err = file.Close()
+	if err != nil {
 		log.fatalErr(err)
 	}
 }
@@ -206,4 +214,11 @@ func numDownMigrationsFromArgs(applyAll bool, args []string) (int, bool, error) 
 	default:
 		return 0, false, errors.New("too many arguments")
 	}
+}
+
+func generateMigrationFiles(dir, prefix, name, ext string) (up, down string) {
+	base := filepath.Join(dir, fmt.Sprintf("%s_%s", prefix, name))
+	up = base + ".up" + ext
+	down = base + ".down" + ext
+	return
 }
